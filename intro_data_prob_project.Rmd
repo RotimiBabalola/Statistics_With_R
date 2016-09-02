@@ -1,0 +1,208 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+* * *
+
+## Part 1: Data
+
+The Behavioral Risk Factor Surveillance System (BRFSS) is a collaborative project
+between all of the states in the United States (US) and participating US territories and
+the Centers for Disease Control and Prevention (CDC). The BRFSS objective is to collect uniform, state-specific data on preventive health practices and risk behaviors that are linked to chronic diseases, injuries, and preventable infectious diseases that affect the adult population.
+
+Since 2011, BRFSS conducts both landline telephone- and cellular telephone-based surveys. In conducting the BRFSS landline telephone survey, interviewers collect data from a randomly selected adult in a household. In conducting the cellular telephone version of the BRFSS questionnaire, interviewers collect data from an adult who participates by using a cellular telephone and resides in a private residence or college housing.
+
+The data collection method involved random sampling for the landline telephone survey but I am not sure if the cellular telephone version involved random sampling. Overall, since this is an observational study with some random sampling I can say the results from this project may be generalizable but we cannot infer causation  - only association.
+
+* * *
+
+## Part 2: Research questions
+
+In summary, my research questions look at the variability of alcohol consumption, tobacco use and exercise across states in the United States. Below I discuss them in detail. Please note that the dataset contains missing values. For my exploratory data analysis, I chose to drop these observations.
+
+**Research quesion 1:**
+
+My first research question aims to examine how much alcohol is consumed across each US state and territory. I would like to see which states and territories of the US have the highest rates of alcohol use and its variability. The variables I will use are:
+
+- _state: State FIPS Code
+- avedrnk2: Avg alcoholic drinks per day in past 30 days
+- maxdrinks: Most drinks on single occasion past 30 days
+
+**Research quesion 2:**
+
+My second research question will look at distribution of tobacco use across each US state and territory. My aim to compute the counts of smokers and non-smokers for each state/territory in the dataset. The variables I will use are:
+
+- _state: State FIPS Code
+- smoke100: Smoked at least 100 cigarettes (categorical variable)
+- smokday2: Frequency of days now smoking (categorical variable)
+
+**Research quesion 3:**
+
+The aim of my third research question is to identify the most popular physical activity across each US state and territory. This interests me because regular exercise has been linked with a healthier lifestyle. So, I would like to see the most popular physical activity for each state/territory by percentage.
+
+- _state: State FIPS Code
+- exract11 : Type of physical activity
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+Before I start my Exploratory Data Analysis, there are two rows in the dataset - 0 and 80 which I filtered out
+
+```{r, eval=TRUE}
+data <- brfss2013 %>% filter(X_state != 0, X_state != 80)
+```
+
+
+**Research quesion 1:**
+
+First, we look at summary statistics for average alcoholic drink per day for the last 30 days
+
+```{r,eval=TRUE}
+summary_stats <- data %>% group_by(X_state) %>% summarise(mean = mean(avedrnk2, na.rm=TRUE), median = median(avedrnk2, na.rm=TRUE), sd = sd(avedrnk2, na.rm=TRUE), min = min(avedrnk2, na.rm=TRUE), max = max(avedrnk2, na.rm=TRUE), count = n())
+
+#The state/territory with the highest daily average alcoholic drinks consumption per day in the past 30 days
+summary_stats %>% arrange(desc(mean))
+
+#Bar chart of the average daily consumption of alcohol by state
+ggplot(data = summary_stats, aes(x = X_state, y = mean)) + geom_bar(stat = "identity") + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Average daily alcohol consumption")
+```
+
+`Puerto Rico` and `Guam` have the highest and second highest average daily consumption of alcoholic drinks respectively while for the other states/territories in the United States the average alcoholic drinks consumption is roughly uniform.
+
+```{r, eval=TRUE}
+#Boxplot showing variablity of daily alcohol consumption by state
+ggplot(data = data, aes(x = X_state, y = avedrnk2)) + geom_boxplot() + coord_flip() + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Avg Alcoholic Drinks Per Day In Past 30 days")
+```
+
+Although the boxplot is not very clear, `Puerto Rico` and `Guam` have the highest variability of average daily alcohol consumption (I zoomed it on RStudio, I don't know how to do it here). Furthermore, all the states/territories have a considerable number of outliers.
+
+
+Next, we look at the summary statistics for the variable *maxdrinks* - Most drinks on a single occassion in the past 30 days
+
+```{r, eval=TRUE}
+summary_stats <- data %>% group_by(X_state) %>% summarise(mean = mean(maxdrnks, na.rm=TRUE), median = median(maxdrnks, na.rm=TRUE), sd = sd(maxdrnks, na.rm=TRUE), min = min(maxdrnks, na.rm=TRUE), max = max(maxdrnks, na.rm=TRUE), count = n())
+
+#The state/territory with the highest average alcoholic drinks consumed on a single occassion in the past 30 days
+summary_stats %>% arrange(desc(mean))
+
+#Bar chart of average alcoholic drinks consumed on a single occassion in the past 30 days
+ggplot(data = summary_stats, aes(x = X_state, y = mean)) + geom_bar(stat = "identity") + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Average alcoholic drinks consumed on a single occasion")
+```
+
+Once again we see almost the same pattern but in this case `Guam` has the highest while `Puerto Rico` has the second highest consumption of alcoholic drinks on a single occasion while for the other states of the US it's roughly uniform.
+
+```{r, eval=TRUE}
+#Boxplot showing variablity of Most Drinks on a Single Occasion in the past 30 days
+ggplot(data = data, aes(x = X_state, y = maxdrnks)) + geom_boxplot() + coord_flip() + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Most Drinks On Single Occasion Past 30 Days")
+```
+
+From the boxplot we can see that *maxdrnks* has more variability for each state compared to the *avedrnk2*. Again, we see that all states have a considerable amount of outliers.
+
+**Research quesion 2:**
+
+Next, we examine the distribution of tobacco use by state. First, let's look at the counts for the variable *smoke100* - Smoked at least 100 cigarettes. It has two levels - "Yes" or "No"
+
+```{r, eval=TRUE}
+#Lets get counts of the two levels of this variable for each state/territory
+smoke100_counts <- data %>% group_by(X_state, smoke100) %>% filter(!is.na(smoke100)) %>% summarise(count = n())
+
+#The states with the highest "Yes" responses
+smoke100_counts %>% filter(smoke100 == "Yes") %>% arrange(desc(count))
+
+#The states with the highest "No" responses
+smoke100_counts %>% filter(smoke100 == "No") %>% arrange(desc(count))
+
+#Barplots of responses to smoke100
+ggplot(data = smoke100_counts, aes(x = X_state, y = count, fill = smoke100)) + geom_bar(stat="identity") + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Smoked at least a 100 cigarettes")
+```
+
+From the counts of the "Yes" responses, `Florida` and `Kansas` have the highest number of people who have smoked at least a 100 cigarettes in the dataset. From the counts of "No" responses, `Florida` and `Kansas` also have the highest number of people who have not smoked at least a 100 cigarettes. 
+
+Furthermore, the barplot shows that the number of people who answered "Yes" or "No" for each state is roughly equal.
+
+Next, let us look at the counts for the levels of the variable *smokday2* - Frequency of days now smoking. It has three levels - "Every day", "Some days" and "Not at all"
+
+```{r, eval=TRUE}
+smokday2_counts <- data %>% group_by(X_state, smokday2) %>% filter(!is.na(smokday2)) %>% summarise(count = n())
+
+#States with the highest non-smokers
+smokday2_counts %>% filter(smokday2 == "Not at all") %>% arrange(desc(count))
+
+#States with the highest daily smokers
+smokday2_counts %>% filter(smokday2 == "Every day") %>% arrange(desc(count))
+
+#States with the highest occasional smokers
+smokday2_counts %>% filter(smokday2 == "Some days") %>% arrange(desc(count))
+
+#Plot of "Every day" or "Some days" responses by state
+smokers <- smokday2_counts %>% filter(smokday2 != "Not at all")
+
+ggplot(data = smokers, aes(x = X_state, y = count, fill = smokday2)) + geom_bar(stat="identity") + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Frequency of Smoking")
+
+```
+
+`Florida` has the highest counts of occasional, daily and non-smokers in the dataset. The barplot also shows that among smokers for each state, daily smokers are more than occasional smokers.
+
+
+**Research quesion 3:**
+Finally, we look at the most popular physical actvity for each state by percentage.
+
+```{r, eval=TRUE}
+#Dataframe that contains counts for physical activities in each state
+exer_counts <- data %>% group_by(X_state, exract11) %>% filter(!is.na(exract11)) %>% summarise(count = n())
+
+#First compute the counts of the most popular physical activity for each state i.e. the maximum
+max_counts <- aggregate(count ~ X_state, exer_counts, FUN = max)
+
+#Then compute the sum of counts of all physical activities for each state
+sum_counts <- aggregate(count ~ X_state, exer_counts, FUN = sum)
+
+#Merge max_counts dataframe with the original dataframe
+combined_df <- merge(max_counts, exer_counts)
+
+#Finally merge this dataframe with the sum_counts dataframe
+all_df <- merge(combined_df, sum_counts, by = "X_state")
+
+#Re-order the dataframe
+all_df <- all_df[, c(1, 3, 2, 4)]
+
+#Change the column names
+names(all_df) <- c("State", "Most popular exercise", "Max", "Sum")
+#Max is the counts for the most popular physical activity
+#Sum is the sum of counts of all physical activities for each state
+
+#Create column that represents percentage of population that take part in this activity
+all_df <- all_df %>% mutate(average = Max/Sum)
+
+#Show first 10 rows of the dataframe
+head(all_df, n = 10)
+
+#Barplot of average
+ggplot(data = all_df, aes(x = State, y = average)) + geom_bar(stat="identity", fill = "lightblue", colour = "black") + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("State") + ylab("Percentage of counts for walking")
+```
+
+We can see that `walking` is the most popular activity for every state and territory of the US with at least 40% or more of respondents in each state engaging in this physical activity. `Arkansas` has the highest percentage of people who engage in walking as a physical activity while `Guam` has the lowest.
+
+

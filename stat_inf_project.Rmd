@@ -1,0 +1,123 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The dataset is from the General Social Survey (GSS). Since 1972, the General Social Survey (GSS) has been monitoring societal change and studying the growing complexity of American society. GSS questions cover a diverse range of issues including national spending priorities, marijuana use, crime and punishment, race relations, quality of life, confidence in institutions, and sexual behaviour.
+
+Since this is a reputable survey, I will assume that random sampling was a part of the data collection process. However, there is no random assignment since this is an observational study. Therefore, the results of this project is generalizable but we cannot infer causation - only association.
+
+* * *
+
+## Part 2: Research question
+
+The aim of my research question is to test whether there is a significant association between race and confidence in the executive branch of goverment. Concretely, I want to determine whether or not confidence in goverment varies by race. The variables I will use are:
+
+- race: Race of respondent
+- confed: Confidence in executive in branch of goverment
+
+The `race` variable has three levels - "White", "Black", "Other" while the `confed` also variable has three levels "A Great Deal", "Only Some", "Hardly Any".
+
+I want to study this because confidence in government is a measure how much trust citizens have in government. I would like to see if the level of trust is significantly the same or different for all races in the dataset.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, I generate a contigency (or 2-way) table of both my categorical variables
+```{r}
+table(gss$race, gss$confed)
+```
+
+From the contigency table, we can see that majority of respondents from each race have "Only some" confidence in government. 
+
+Next, I generate a plot of confidence in government by race
+
+```{r}
+#Convert contigency table to a dataframe
+conf_table <- data.frame(table(gss$race, gss$confed))
+
+#Change column names 
+names(conf_table) <- c("Race", "Confidence", "Counts")
+
+#Plot of confidence in government by Race
+ggplot(data = conf_table, aes(x = factor(Race), y = Counts, fill = Confidence)) + geom_bar(stat = "identity", position = "dodge") + xlab("Race") + ylab("Frequency")
+```
+
+From the plot above we can see a sort of pattern among the races. For each race, majority of respondents have "Only Some" in confidence in the executive branch of government, followed by "Hardly Any" confidence and a small number of respondents expressing "A Great Deal" confidence in the executive branch of government.
+
+
+* * *
+
+## Part 4: Inference
+
+#### Hypotheses
+
+I will start by stating the null and alternate hypothesis
+
+Null Hypothesis, H<sub>o</sub> : Race and confidence in the executive branch of government are *independent*. That is, confidence in the executive branch of government does not vary by race.
+
+Alternate Hypothesis, H<sub>A</sub> : Race and confidence in the executive branch of government are *dependent*. That is, confidence in the executive branch of government varies by race.
+
+#### Check conditions
+
+Next, I state the conditions for the Chi-Square test of independence I am using for my inference.
+
+1. Independence: I will assume random sampling was carried out since this is a reputable survey. Furthermore, the number of observations we are considering (n = 37,637) is definitely less than 10% of the US population.
+
+2. Sample size: The expected counts for each scenario we will consider is more than 5.
+
+Therefore, we can conclude that the conditions for this test is met.
+
+#### Method for Inference
+
+I will use the Chi-Square test of independence for my inference since I am dealing with 2 categorical variables where at least 1 variable has more than 2 levels.
+
+#### Testing the Hypothesis
+
+Next, I test the hypothesis using the `chisq.test` function from R. This function accepts a contingency table as its argument and outputs the chi-squared value, degrees of freedom and p-value as the result. Note that we are testing the relationship between race and confidence in the executive branch of government at the 5% significance level.
+
+```{r}
+chisq.test(table(gss$race, gss$confed))
+```
+
+#### Interpretation
+
+The output tells us that the Chi-squared value is 51.949, df = 4 and the p-value is 1.414e-10. Since the p-value is very small and is much lower than our significance level, we reject the null hypothesis H<sub>o</sub> and conclude that there is a significant association between race and confidence in the executive branch of government. 
+
+This means that the respondents from each race in the dataset have varying levels of confidence in the executive branch of government. However, we should note that since this is an observational study, we cannot infer a causal relationship between these two variables from the analysis. We can only infer that they are significantly associated with each other.
+
+I did not include a confidence interval in my result because there is no associated confidence interval for the Chi-Square test of independence.
+
+
+
+
+
+
+

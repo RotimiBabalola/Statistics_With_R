@@ -1,0 +1,222 @@
+---
+title: "Bayesian modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(BAS)
+library(reshape2)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+* * *
+
+## Part 1: Data
+
+The dataset is comprised of 651 randomly sampled movies produced and released before the year 2016. Information on these movies was gotten from the Internet Movie DataBase (IMDB) and Rotten Tomatoes. 
+
+The data collection method involved random sampling but no random assignment. Therefore, the results from this project is generalizable but we cannot infer causation from our results - only association.
+
+* * *
+
+## Part 2: Data manipulation
+
+Next we create some of the variables required for our analysis
+
+```{r}
+#feature_film
+movies <- movies %>% 
+            mutate(feature_film = ifelse(title_type == "Feature Film", "yes", "no"))
+
+#drama
+movies <- movies %>% 
+            mutate(drama = ifelse(genre == "Drama", "yes", "no"))
+
+#mpaa_rating_R
+movies <- movies %>% 
+            mutate(mpaa_rating_R = ifelse(mpaa_rating == "R", "yes", "no"))
+
+#oscar_season
+movies <- movies %>%
+            mutate(oscar_season = ifelse(thtr_rel_month %in% c(10, 11, 12), "yes", "no"))
+
+#summer_season
+movies <- movies %>% 
+            mutate(summer_season = ifelse(thtr_rel_month %in% c(5, 6, 7, 8), "yes", "no"))
+
+#Convert them to factors
+movies$feature_film <- as.factor(movies$feature_film)
+
+movies$drama <- as.factor(movies$drama)
+
+movies$mpaa_rating_R <- as.factor(movies$mpaa_rating_R)
+
+movies$oscar_season <- as.factor(movies$oscar_season)
+
+movies$summer_season <- as.factor(movies$summer_season)
+```
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+#### Plots
+
+Next, we construct plot to visualize the relationship between `audience_score` and the new variables we created.
+
+```{r}
+
+exp_data <- movies %>%
+                dplyr::select(audience_score, feature_film, drama, mpaa_rating_R, oscar_season, summer_season)
+
+exp_data <- melt(exp_data, 'audience_score')
+
+#Boxplot of new variables against audience_score
+ggplot(data = exp_data, aes(x = variable, y = audience_score, color = value)) + geom_boxplot() + xlab("New variables") + ylab("Audience scores")
+```
+
+From the boxplots shown above we can see the following:
+
+- The median audience score for movies released during the oscar season is higher compared to movies that were not released during the oscar season. 
+
+- The median audience score for movies that belong to the `Drama` genre is higher compared to movies from other genres. Furthermore, we can see that the distribution of audience scores for `Drama` movies has less variability compared to movies from other genres.
+
+- For movies that are *not* feature films, the median audience score is much higher compared to movies that are feature films. Furthermore, the distribution of audience scores for movies that are *not* feature films has less variability compared to movies that are feature films.
+
+
+#### Summary statistics
+
+Next we compute the summary statistics for audience scores and the new variables we created. 
+
+```{r}
+exp_data %>% group_by(variable, value) %>%
+                    summarise(mean = mean(audience_score), median = median(audience_score), sd =                                       sd(audience_score))
+```
+
+The summary statistics simply confirm what the boxplots showed us earlier. In particlar we can see that for both levels of the variables `mpaa_rating_R` and `summer_season` the summary statistics of audience scores do not change substantially.
+
+* * *
+
+## Part 4: Modeling
+
+Next we develop a Bayesian regression model to predict `audience_score`. This is done using all the specified predictors.
+
+```{r}
+#First create dataframe that contains only the selected predictors
+train_data <- movies %>% 
+                dplyr::select(audience_score, feature_film, drama, runtime, mpaa_rating_R, thtr_rel_year, oscar_season, summer_season, imdb_rating, imdb_num_votes, critics_score, best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box)
+
+#Next I generate a multiple regression using all the predictors
+audience_score_model <- bas.lm(audience_score ~ ., data = na.omit(train_data), prior = "BIC", modelprior = uniform(), method = "MCMC")
+```
+
+#### Model Diagnostics
+
+```{r}
+diagnostics(audience_score_model)
+```
+
+From the plot we can see that the renormalized and MCMC posterior inclusion probability (PIP) are in close agreement.
+
+```{r, eval=TRUE}
+par(mfrow = c(2,2))
+
+for(i in 1:4){
+    plot(audience_score_model, which = i)
+}
+```
+
+The first plot, in the top left corner, shows the residuals and fitted values. This plot shows that the distribution of residuals is not constant across the fitted values as most of them are concentrated in a particular region. 
+
+The next plot, in the top right corner, is a plot of cumulative model probabilities. We can see that we discovered over 2500 unique models using MCMC sampling. This probability starts to level off around 500 models.
+
+Next, in the bottom left corner, is a plot of model size versus the log of the marginal likelihood (Bayes Factor). The models with the highest Bayes factor or marginal likelihoods have 3 or more predictors.
+
+The last plot, in the bottom right corner, shows the importance of predictors. We see that the most important predictors are the `intercept`, `imdb_rating` and `critics score`. The `runtime` variable also seems to be fairly important.
+
+```{r}
+#Next we use the image function to view the high probability models
+image(audience_score_model, rotate=F)
+```
+
+From the image we can see that only `imdb_rating` included the top 20 models, followed by `critics_score` which is included in the 18 models.
+
+#### Interpreting coefficients
+Next we interprete some of the coefficients of the model.
+
+```{r}
+coefficients(audience_score_model)
+```
+
+From the coefficients above we can say that:
+
+- All other variables held constant, for a change *d* in the `imdb_rating` of a movie, the `audience_score` for the movie is expected to change by 14.98*d points on average. Note that this variable can change by a value lower than 1.
+
+- All other variables held constant, for every unit change in the `critics_score` of a movie, the `audience_score` is expected to change by 0.0631 points on average.
+
+- All other variables held constant, for every change (in minutes) in the `runtime` of a movie, the `audience_score` is expected to change by -0.02566 points on average.
+
+* * *
+
+## Part 5: Prediction
+
+I went ahead to predict the audience score for the movie `X-Men Apocalypse`. I got the data for this movie from Rotten Tomatoes and IMDB. 
+
+```{r}
+#Attributes for the movie
+xmen <- data.frame(audience_score = 0, feature_film = factor("yes", levels = c("yes", "no")), drama = factor("no", levels = c("yes", "no")), runtime = 144, mpaa_rating_R = factor("no", levels = c("yes", "no")), thtr_rel_year = 2016, oscar_season = factor("no", levels = c("yes", "no")), summer_season = factor("yes", levels = c("yes", "no")), imdb_rating = 7.3, imdb_num_votes = 147183, critics_score = 48, best_pic_nom = factor("no", levels = c("yes", "no")), best_pic_win = factor("no", levels = c("yes", "no")), best_actor_win = factor("no", levels = c("yes", "no")), best_actress_win = factor("yes", levels = c("yes", "no")), best_dir_win = factor("no", levels = c("yes", "no")), top200_box = factor("yes", levels = c("yes", "no")))
+
+
+#Predict audience score for the movie
+pred_score <- predict(audience_score_model, newdata = xmen, estimator = "HPM", se.fit = TRUE, type = "response")
+
+#Extract the fitted values i.e. the predicted movie score
+pred_score$Ybma
+
+#credible interval
+pred_ci <- confint(pred_score, parm = "pred")
+
+pred_ci[pred_score$Ybma, ]
+
+```
+
+The model predicted an `audience_score` of 71.7 for the movie. This prediction is very close - the actual audience score is 71 (a difference of about 0.007%). The 95% credible interval for our prediction is 51.95 - 91.51. This interval contains the predicted score for the movie which is very good.
+
+
+* * *
+
+## Part 6: Conclusion
+
+In this project we were able to develop a Bayesian regression model which performed pretty well in predicting audience scores. 
+
+One interesting I learnt from the data and the research question is that the runtime of a movie is associated with lower audience scores. I think this is becauses audiences may get bored with a movie if it lasts for too long and thus give it low ratings.
+
+One shortcoming of this project is that we can only infer only association from our results. I think it would be good if future efforts can focus on ways that allow us infer causation from our results. That is, it would be good if we can identify the factors that cause favourable/unfavourable audience scores.
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,314 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The dataset is comprised of 651 randomly sampled movies produced and released before the year 2016. Information on these movies was gotten from the Internet Movie DataBase (IMDB) and Rotten Tomatoes. 
+
+The data collection method involved random sampling but no random assignment. Therefore, the results from this project is generalizable but we cannot infer causation from our results - only association.
+
+* * *
+
+## Part 2: Research question
+
+The aim of my research question is to identify movie attributes that are significantly associated with higher or lower critics/audience scores. These attributes will be used to develop two models to predict critics and audience scores respectively.
+
+Movies popular with critics may not be popular with audiences and vice versa. I would like to:
+
+- Identify movie attributes that are associated with higher or lower critics/audience scores.
+- Predict the critics and audience score for a movie so we can determine whether or not a movie will be a hit with either critics or audiences (or both).
+
+Please note that the dataset contains some missing values. For my regression analysis, I chose to drop these missing observations.
+
+##### Response variables
+
+- critics_scores: Critics score on Rotten Tomatoes
+- audience_scores Audience score on Rotten Tomatoes
+
+##### Explanatory variables
+
+- genre: Genre of movie
+- runtime: Runtime of movie (in minutes)
+- best_pic_nom : Whether or not the movie was nominated for a best picture Oscar (no, yes)
+- best_pic_win : Whether or not the movie won a best picture Oscar (no, yes)
+- best_actor_win : Whether or not one of the main actors in the movie ever won an Oscar (no, yes)
+- best_actress_win : Whether or not one of the main actresses in the movie ever won an Oscar (no, yes)
+- best_dir_win : Whether or not the director of the movie ever won an Oscar (no, yes) 
+- top200_box : Whether or not the movie is in the Top 200 Box Office list on BoxOfficeMojo (no, yes)
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+#### Distribution of critics and audience scores
+
+There is duplicate row in the dataset, let's drop it
+```{r}
+
+unique_mov <- movies[-244, ]
+
+#Drop missing data from the analysis
+unique_mov <- na.omit(unique_mov)
+
+#Histogram of audience scores
+ggplot(data = unique_mov, aes(x = audience_score)) + geom_histogram(binwidth = 10) + scale_x_continuous("Audience Score", breaks = seq(0, 100, by = 10))
+
+#Histogram of critics scores
+ggplot(data = unique_mov, aes(x = critics_score)) + geom_histogram(binwidth = 10) + scale_x_continuous("Critics Score", breaks = seq(0, 100, by = 10))
+```
+
+The distribution of audience scores is bimodal with two roughly equal peaks at 80 and 85. Furthermore, majority of the scores are concentrated at the range 30 - 90 with 20 or more movies getting a score between this interval. The distribution also appears to be slightly left skewed.
+
+The distribution of critics scores is unimodal with a peak at 90. Furthermore critics' scores appear to be uniformly distributed between 10 and 60. This distribution does not seem to have any significant skew to the left or right.
+
+#### Barplot of Genres
+```{r}
+ggplot(data = unique_mov, aes(x = genre)) + geom_bar() + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 1))
+```
+
+The barplot shows that `Drama` genre has the highest number of movies in the dataset
+
+### Visualizing spread of critics and audience scores by movie genres
+```{r}
+#Boxplot showing variablity of audience's scores by movie genre
+ggplot(data = unique_mov, aes(x = genre, y = audience_score)) + geom_boxplot() + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 1)) + scale_y_continuous("Audience score")
+
+#Boxplot showing variability of critics' scores by movie genre
+ggplot(data = unique_mov, aes(x = genre, y = critics_score)) + geom_boxplot() + theme(text = element_text(size = 12), axis.text.x = element_text(angle = 90, vjust = 1)) + scale_y_continuous("Critics score")
+```
+
+From the boxplots above, we can see that critics scores tend to have more variability than audience scores for most movie genres.
+
+### Summary statistics of critics and audience scores by genre
+```{r}
+#Summary statistics of audience scores by genre
+unique_mov %>%
+    group_by(genre) %>%
+        summarise(mean_score = mean(audience_score), median_score = median(audience_score), sd_score = sd(audience_score), n = n())
+
+#Summary statistics of critics scores by genre
+unique_mov %>%
+    group_by(genre) %>%
+        summarise(mean_score = mean(critics_score), median_score = median(critics_score), sd_score = sd(critics_score), n = n())
+```
+
+The summary statistics indicate that genres such as `Action & Adventure`, `Animation`, `Comedy` and `Art House & International` are more popular with audiences than critics. The only genre with a higher summary statistic for the critics score is the `Documentary` genre. Other genres have similar summary statistics for both critics and audience scores.
+
+* * *
+
+## Part 4: Modeling
+
+```{r}
+
+#Model to predict audience scores
+audience_score_model <- lm(audience_score ~ genre + runtime + best_pic_nom + best_pic_win + best_actor_win + best_actress_win + best_dir_win + top200_box, data = unique_mov)
+
+summary(audience_score_model)
+
+#Model to predict critics scores
+critics_score_model <- lm(critics_score ~ genre + runtime + best_pic_nom + best_pic_win + best_actor_win + best_actress_win + best_dir_win + top200_box, data = unique_mov)
+
+summary(critics_score_model)
+
+```
+
+### Model Selection
+
+Since I am trying to find the statistically significant predictors for critics/audience scores, I am going to use the p-value criteria to decide whether a predictor should remain in the model.
+
+#### Audience scores model
+
+The predictor `best_pic_win` has the highest p-value, therefore it will be dropped. Note that this variable has only two levels - yes or no. So it's okay to drop it
+
+```{r}
+best_aud_model <- lm(audience_score ~ genre + runtime + best_pic_nom + best_actor_win + best_actress_win + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_aud_model)
+
+#Next we drop 'best_actor_win'. Note that even though genreComedy has a higher p-value, we don't drop it because other levels of this predictor are significant.
+
+best_aud_model <- lm(audience_score ~ genre + runtime + best_pic_nom + best_actress_win + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_aud_model)
+
+#Drop best_actress_win
+
+best_aud_model <- lm(audience_score ~ genre + runtime + best_pic_nom + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_aud_model)
+
+#Finally drop best_dir_win
+
+best_aud_model <- lm(audience_score ~ genre + runtime + best_pic_nom + top200_box, data = unique_mov)
+
+summary(best_aud_model)
+
+```
+
+For **audiences** the significant predictors are:
+
+- genre (5 out of 10 levels are significant predictors). They are:
+    + Art House & International
+    + Documentary
+    + Drama
+    + Musical & Performing Arts
+    + Other
+- runtime
+- best_pic_nom
+- top200_box
+
+
+#### Critics scores model
+
+I am using the p-value selection criteria as a basis for dropping predictors from the model. The predictor `best_pic_win` has the highest p-value so it will be dropped from the model.
+
+```{r}
+best_critics_model <- lm(critics_score ~ genre + runtime + best_pic_nom +  best_actor_win + best_actress_win + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_critics_model)
+
+#Drop best_actress_win
+best_critics_model <- lm(critics_score ~ genre + runtime + best_pic_nom +  best_actor_win  + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_critics_model)
+
+#Drop best_actor_win
+best_critics_model <- lm(critics_score ~ genre + runtime + best_pic_nom + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_critics_model)
+
+#Drop runtime
+best_critics_model <- lm(critics_score ~ genre + best_pic_nom + best_dir_win + top200_box, data = unique_mov)
+
+summary(best_critics_model)
+
+```
+
+For **critics** the significant predictors are:
+
+- genre (6 out of 10 levels are significant predictors). They are:
+    + Art House & International
+    + Documentary
+    + Drama
+    + Musical & Performing Arts
+    + Mystery & Suspense
+    + Other
+- best_pic_nom
+- best_dir_win
+- top200_box
+
+* * *
+
+### Model Diagnostics
+
+Next, I ran model diagnostics on both models to check if linear regression conditions are satisfied.
+
+#### Diagnostics for audience scores model
+
+```{r}
+plot(unique_mov$audience_score, best_aud_model$residuals)
+
+#Add red horizontal line to the plot at zero
+abline(h = 0, col = "red")
+
+
+#Histogram of residuals
+hist(best_aud_model$residuals)
+
+qqnorm(best_aud_model$residuals)
+qqline(best_aud_model$residuals)
+```
+
+
+
+#### Diagnostics for critics scores model
+
+```{r}
+plot(unique_mov$audience_score, best_critics_model$residuals)
+
+#Add red horizontal line to the plot at zero
+abline(h = 0, col = "red")
+
+
+#Histogram of residuals
+hist(best_critics_model$residuals)
+
+qqnorm(best_critics_model$residuals)
+qqline(best_critics_model$residuals)
+```
+
+We can see that the conditions for regression are fairly satisfied for both models.
+
+
+## Part 5: Prediction
+
+I went ahead to predict the critics and audience score for the movie `X-Men Apocalypse`. I got data for this movie from its Wikipedia article. Although the movie is called a super-hero film in the article, I think the `Action & Adventure` genre is the closest to it in the dataset.
+
+```{r}
+#Attributes for the movie
+genre <- c("Action & Adventure")
+best_pic_nom <- c("no")
+best_pic_win <- c("no")
+best_actor_win <- c("no")
+best_actress_win <- c("yes") #Jennifer Lawrence
+best_dir_win <- c("no")
+top200_box <- c("yes")
+runtime <- c(144)
+
+xmen <- data.frame(genre, runtime, best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box)
+
+#Predict audience score with 95% confidence interval
+predict(best_aud_model, xmen, interval = "confidence", level = 0.95)
+
+#Predict critics score with 95% confidence interval
+predict(best_critics_model, xmen, interval = "confidence", level = 0.95)
+```
+
+The predicted audience score for the X-Men Apocalypse movie is higher so we predict that the movie will be bigger hit with audiences than critics.
+
+* * *
+
+## Part 6: Conclusion
+
+In this project we were able to build two models for predicting the critics and audience scores for a movie. The models had adjusted $R^2$ values of 22.2% and 23.25% respectively.
+
+I have learnt that whether or not a movie (or its director) has been nominated for an Oscar is a significantly associated with critics scores. This makes sense because a critic may give a movie a more favorable score if its director has been nominated for an Oscar. Also, movies with favorable critics scores tend to receive more Oscar nominations.
+
+The runtime of a movie is also significantly associated with audience scores.
+
+#### Limitations of the project and Future Research
+I think one main limitation of this project is that there are many factors (and combination of factors) associated with critics and audiences scores and it's possible that some of these factors were not included in the models we developed. So predictors which may look significant may not be significant when these other factors are included. So I would recommend future efforts to look for ways to build a model which will include all these factors.
+
+Another thing I want to recommend is future efforts should focus on ways that allow us to infer causation not just association. That is, it would be good if we can identify the factors that cause favourable/unfavourable critics or audience scores.
+
+
+
+
+
+
